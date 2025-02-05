@@ -1,0 +1,209 @@
+---
+title: "HW 2 Exploration"
+author: "Ian Morris"
+date: last-modified
+format:
+  html:
+    embed-resources: true 
+---
+
+## Set Up
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+# Load packages 
+library(tidyverse)
+library(here)
+library(readxl)
+library(spData)
+library(sf)
+library(tmap)
+```
+
+## Data Import
+
+```{r}
+# Read in three excel files from MARINe biodiversity data 
+point_contact_raw <- read_excel(here('data', 'MARINe_biodiversity_data',
+                                     'cbs_data_CA_2023.xlsx'), sheet = 'point_contact_summary_data')
+quadrat_raw <- read_excel(here('data', 'MARINe_biodiversity_data',
+                               'cbs_data_CA_2023.xlsx'), sheet = 'quadrat_summary_data')
+swath_raw <- read_excel(here('data', 'MARINe_biodiversity_data',
+                             'cbs_data_CA_2023.xlsx'), sheet = 'swath_summary_data')
+
+# Read in Dangermond preserve shape file 
+dangermond <- read_sf(here('data', 'dangermond_shapefile', 'jldp_boundary.shp'))
+
+# Read in California state boundary 
+california <- spData::us_states %>% 
+  filter(NAME == "California")
+
+```
+
+## Data Cleaning
+
+Lots of cleaning based on our capston project
+
+```{r}
+# Clean point_contact dataset 
+point_contact_clean <- point_contact_raw %>% 
+  # Remove non-matching columns 
+  select(!c('number_of_transect_locations', 'percent_cover')) %>% 
+  # Rename num of hits to total count 
+  rename(total_count = number_of_hits) %>% 
+  # Create new data collection source column 
+  mutate(collection_source = "point contact") %>% 
+  # Filter to mainland only 
+  filter(island == "Mainland") %>% 
+  # Remove certain species lumps 
+  filter(!species_lump %in% c("Rock", "Sand", "Tar", "Blue Green Algae", "Red Crust", "Diatom", "Ceramiales"))
+
+# Clean quadrat dataset 
+quadrat_clean <- quadrat_raw %>% 
+  # Remove non-matching columns 
+  select(!c('number_of_quadrats_sampled', 'total_area_sampled_m2', 'density_per_m2')) %>% 
+  # Create new data collection source column 
+  mutate(collection_source = "quadrat") %>% 
+  # Filter to mainland only 
+  filter(island == "Mainland") %>% 
+  # Remove certain species lumps 
+  filter(!species_lump %in% c("Rock", "Sand", "Tar", "Blue Green Algae", "Red Crust", "Diatom", "Ceramiales"))
+
+# Clean swath dataset 
+swath_clean <- swath_raw %>% 
+  # Remove non-matching columns 
+  select(!c('number_of_transects_sampled', 'est_swath_area_searched_m2',  'density_per_m2')) %>% 
+  # Create new data collection source column 
+  mutate(collection_source = "swath") %>% 
+  # Filter to mainland only 
+  filter(island == "Mainland") %>% 
+  # Remove certain species lumps 
+  filter(!species_lump %in% c("Rock", "Sand", "Tar", "Blue Green Algae", "Red Crust", "Diatom", "Ceramiales"))
+```
+
+#### Merge datasets
+
+Merge data sets for easy calculations
+
+```{r}
+# Merge the 3 dataset together 
+biodiv_merge <- bind_rows(point_contact_clean, quadrat_clean, swath_clean)
+```
+
+```{r}
+#| warning: false
+#| message: false
+# Group by site and species (no year)
+biodiv_total <- biodiv_merge %>% 
+  group_by(marine_site_name, latitude, longitude, species_lump, year) %>% 
+  summarise(num_count = sum(total_count))
+```
+
+```{r}
+# Create column to indicate presence/absence
+biodiv_total <- biodiv_total %>% 
+  mutate(presence = ifelse(num_count >= 1, 1, 0))
+```
+
+
+#### California Data
+
+```{r}
+# Convert to WGS84 to lat long
+california <- st_transform(california, crs = 4326)
+```
+
+#### Convert biodiv data to sf object
+
+```{r}
+biodiv_geo <- biodiv_total %>% 
+  filter(presence == 1) %>%  
+  st_as_sf(coords = c("longitude", "latitude"), crs = st_crs(california), remove = FALSE)
+
+# Check that the crs matches 
+if(st_crs(california) == st_crs(biodiv_geo)) {
+  print("The coordinate reference systems match")
+} else {
+  print("The coordinate reference systems do NOT match. Transformation of CRS is recommended.")
+}
+```
+
+#### Filter Top Ten Species
+
+```{r}
+total_count <- biodiv_geo %>% 
+  group_by(species_lump) %>% 
+  summarise(
+    total_count = sum(num_count)
+  ) %>% 
+  arrange(desc(total_count))
+```
+
+```{r}
+top_ten <- total_count %>% 
+  filter(!grepl("spp", species_lump)) %>%
+  slice_max(order_by = total_count, n = 5) %>% 
+  arrange(total_count)
+```
+
+```{r}
+top_ten_geo <- biodiv_geo %>% 
+  filter(species_lump  %in% top_ten$species_lump)
+```
+
+## Top Ten Species Map
+
+```{r}
+tm_shape(california) +
+  tm_borders() +
+tm_shape(top_ten_geo) + 
+  tm_symbols(col = "species_lump", size = .1) 
+```
+
+## Top Ten Observed Species
+
+```{r}
+top_ten %>% 
+  ggplot(aes(x=fct_infreq(species_lump, total_count), 
+           y = total_count, fill = species_lump)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_viridis_d() +
+  labs(y = "Total Count", x = "Species")
+```
+
+## Unique Species by Year
+
+```{r}
+species_freq <- biodiv_geo %>% 
+  group_by(year) %>% 
+  summarise(
+    total_species = n_distinct(species_lump)
+  )
+```
+
+```{r}
+ggplot(species_freq, aes(x = year, y = total_species)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Species Richness by Year",
+    x = "Year",
+    y = "Unique Species"
+  )
+```
+## Additional Questions
+
+1. What have you learned about your data? Have any potentially interesting patterns emerged?
+
+I have learned that there is a lot of species that are not as easily identified that make up the majority of observations. That is why I filtered out anything simply at the genus level ("Genus spp"). One interesting pattern is that the Lottia genus seems to dominate the observations.
+
+2. In HW #1, you outlined some questions that you wanted to answer using these data. Have you made any strides towards answering those questions? If yes, how so? If no, what next steps do you need to take (e.g. I need to create X plot type, I still need to track down Y data, I need to restructure existing data so that you can visualize it in Z ways, etc.)?
+
+Based on the data wrangling, I do not believe that my initial question is one I should pursue. However, I have made strides in exploring the data to understand different effective methods I can undertake to help create an interesting visualization form this data. For example, I believe my new question should look at Genus or Families of species as a whole, and see how climate change is impacting them (Location, Abundance, and Species Diversity)
+
+3. What challenges do you foresee encountering with your data? These can be data wrangling and / or visualization challenges.
+
+This new approach, while more focused than before, is a bit daunting. The methods to approach this will need to be more concise than the exploratory analysis performed here. Also, the geospatial aspect may prove difficult.
