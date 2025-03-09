@@ -96,16 +96,14 @@ biodiv_merge <- bind_rows(point_contact_clean, quadrat_clean, swath_clean)
 #| warning: false
 #| message: false
 # Group by site and species (no year)
-biodiv_total <- biodiv_merge %>% 
-  group_by(marine_site_name, latitude, longitude, species_lump, year) %>% 
-  summarise(num_count = sum(total_count))
+genus_sum <- biodiv_merge %>% 
+  mutate(genus = word(species_lump)) %>% 
+  group_by(genus, year, latitude) %>% 
+  summarise(num_count = sum(total_count)) %>% 
+  # Create column to indicate presence/absence
+  mutate(presence = ifelse(num_count >= 1, 1, 0)) 
 ```
 
-```{r}
-# Create column to indicate presence/absence
-biodiv_total <- biodiv_total %>% 
-  mutate(presence = ifelse(num_count >= 1, 1, 0))
-```
 
 
 #### California Data
