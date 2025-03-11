@@ -67,6 +67,7 @@ sysfonts::font_add_google("Inter")
 
 ```{r}
 # SpongeBob color palette
+# Define your colors
 colors <- c(
   "Purple" = "#56446E", 
   "Light Purple" = "#C187D4",
@@ -77,7 +78,7 @@ colors <- c(
   "Sand" = "#F2F0DF"
 )
 
-# Custom SpongeBob Theme
+# Custom SpongeBob Theme - without background image
 theme_spongebob <- function() {
   theme_minimal(base_size = 14) +
     theme(
@@ -86,11 +87,11 @@ theme_spongebob <- function() {
       axis.text = element_text(face = "italic"),
       legend.text = element_text(face = "bold"),
       panel.background = element_blank(),
-      plot.background = here("image", "sand.jpg"),
+      plot.background = element_rect(fill = colors["Sand"], color = NA),  # Use a color, not an image path
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       legend.box.background = element_rect(fill='transparent'),
-      panel.border = element_blank(),
+      panel.border = element_blank()
     )
 }
 ```
@@ -410,7 +411,7 @@ pisaster_sum_perc <- purple_df %>%
   summarise(total_count_sum = sum(total_count, na.rm = TRUE), .groups = "drop") 
 
 # Plot with corrected normalized count
-ggplot(pisaster_sum_perc, aes(x = year_bin, y = total_count_sum, 
+p3 <- ggplot(pisaster_sum_perc, aes(x = year_bin, y = total_count_sum, 
                               fill = species_lump)) +
   geom_col(position = "stack") +  # Dodge to see separate species
   scale_fill_manual(labels = c("Purple Sea Star", "Purple Sea Urchin"),
@@ -436,6 +437,7 @@ ggplot(pisaster_sum_perc, aes(x = year_bin, y = total_count_sum,
     axis.title = element_markdown(size = 14),
     plot.title = element_markdown(size = 16, face = "bold", hjust = .5)
   ) 
-
+p3
+#ggbackground(p3, here("images", "sand.jpg"))
 ```
 
