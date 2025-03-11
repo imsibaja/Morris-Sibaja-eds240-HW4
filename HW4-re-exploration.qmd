@@ -50,23 +50,51 @@ I like how the colors fill up the animal outline, I think it can help me portay 
 # Load packages 
 library(tidyverse)
 library(here)
-library(readxl)
-library(spData)
-library(sf)
-library(tmap)
-library(ggplot2)
-library(ggridges)
-library(taxize)
-library(ggplot2)
 library(gganimate)
-library(dplyr)
 library(sysfonts)
+library(rnaturalearth)  
+library(rnaturalearthdata)
+library(zoo)
+library(ggimage)
+library(scales)
 ```
 
 
 ```{r}
-sysfonts::font_add_google("Slackey-Regular")
+sysfonts::font_add_google("Slackey")
+sysfonts::font_add_google("Inter")
 ```
+
+```{r}
+# SpongeBob color palette
+colors <- c(
+  "Purple" = "#56446E", 
+  "Light Purple" = "#C187D4",
+  "Blue" = "#859ED7",      
+  "Gold" = "#CEA940",    
+  "Pink" = "#CB6D75",    
+  "Green" = "#2A584C",
+  "Sand" = "#F2F0DF"
+)
+
+# Custom SpongeBob Theme
+theme_spongebob <- function() {
+  theme_minimal(base_size = 14) +
+    theme(
+      text = element_text(family = "Slackey", color = "#56446E"),
+      axis.title = element_text(face = "bold"),
+      axis.text = element_text(face = "italic"),
+      legend.text = element_text(face = "bold"),
+      panel.background = element_blank(),
+      plot.background = here("image", "sand.jpg"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      legend.box.background = element_rect(fill='transparent'),
+      panel.border = element_blank(),
+    )
+}
+```
+
 
 ## Data Import
 
@@ -154,9 +182,16 @@ purple_df <- biodiv_merge %>%
     mpa = case_when(
       mpa_designation == "NONE" ~ FALSE,
       TRUE ~ TRUE
+    ),
+    region = case_when(
+      latitude <= 34.44 ~ "South",
+      latitude > 34.44 & latitude <= 37.82 ~ "Central",
+      latitude > 37.82 ~ "North"
     )
   ) %>% 
-  st_as_sf(coords = c("longitude", "latitude"), crs = st_crs(california), remove = FALSE)
+  mutate(year_bin = round(year/5) * 5) %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = st_crs(california), remove = FALSE) %>% 
+  mutate(region = factor(region, levels = c("North", "Central", "South")))
 
 # Check that the crs matches 
 if(st_crs(california) == st_crs(purple_df)) {
@@ -167,7 +202,7 @@ if(st_crs(california) == st_crs(purple_df)) {
 ```
 
 
-#### MPA Pisaster Plot
+#### MPA relative abundance
 
 ```{r}
 purple_sum <- purple_df %>% 
@@ -184,42 +219,46 @@ smoothed_data <- purple_sum %>%
 # Plot the smoothed data
 ggplot(smoothed_data, aes(x = year, y = num_count_smooth, 
                           fill = factor(species_lump, levels = c("Strongylocentrotus purpuratus",
-                                                                 #"Mytilus californianus",
-                                                                 "Pisaster ochraceus")))) +
+                                                                 "Pisaster ochraceus")))) +  
+  facet_wrap(~mpa, 
+             labeller = labeller(
+               mpa = c("TRUE" = "MPAs", "FALSE" = "non MPAs" )
+             )) +
   geom_area(position = "fill") +  
-  scale_fill_manual(values = c("Pisaster ochraceus" = "#6A0DAD", 
-                               "Strongylocentrotus purpuratus" = "purple" # Adjusted for clarity
-                               #"Mytilus californianus" = "purple"  # Adjusted for distinction
+  scale_fill_manual(values = c("Pisaster ochraceus" = "#56446E" , 
+                               "Strongylocentrotus purpuratus" = "#C187D4" 
   )) +
   labs(
-    title = "",
-    subtitle = "Fluctuations occur in Pisaster species, a genus of Sea Star",
+    title = "<span style='color:#56446E;'>Purple Sea Stars</span>
+    <span style='color:#2A584C;'>**vs**</span>
+    <span style='color:#C187D4;'>Purple Urchins</span>
+    </span>",
+    subtitle = "MPAs provide stable population fluctuations",
     x = "Year",
-    y = "Percentage of Total Counts",
+    y = "Relative Abundance",
     fill = "Species"
   ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks=c(2001, 2010, 2020)) +
+  coord_flip() +
+  theme_spongebob() +
   theme(
-    legend.position = "none"
-  ) +  
-  facet_wrap(~mpa)
+    axis.text = element_text(size=8, margin = margin(0,0,3,0, "cm")),
+    axis.title = element_text(margin = margin(0,0,3,0, "cm")),
+    panel.grid.major = element_blank(),
+    legend.position = "none", 
+    plot.title.position = "plot", 
+    panel.spacing = unit(1.5, "lines"),
+    plot.title = element_markdown(hjust = .5, vjust = 0, size = 16, color = colors["Purple"]),
+    plot.subtitle = element_text(hjust = .5, vjust = 0, size = 13, color = colors["Green"]),
+    strip.text = element_text(hjust = .5, vjust = 0, size = 10, color = colors["Blue"]),
+  ) 
 
 ```
 
 
 
 #### Latitudinal Shift Map
-
-```{r, fig.width=10, fig.height=6}
-
-# Maybe I can group a mean by the latitudnal bins then show how those shift on a plot of CA
-#install.packages(c("ggplot2", "gganimate", "sf", "rnaturalearth", "rnaturalearthdata"))
-library(ggplot2)
-library(gganimate)
-library(dplyr)
-library(sf)  # For spatial data
-library(rnaturalearth)  # To get California map
-library(rnaturalearthdata)
-```
 
 ```{r}
 # Load California map
@@ -228,136 +267,175 @@ california <- ne_states(country = "United States of America", returnclass = "sf"
   st_transform(crs = 4326)
 ```
 
-
-```{r}
-library(ggforce)  # For hex bins
-
-# Aggregate data into 1-degree bins (adjust as needed)
-purple_time_df <- purple_df %>%
-  mutate(year_bin = round(year/2) * 2) %>% 
-  mutate(lon_bin = round(longitude, 0), lat_bin = round(latitude, 0)) %>%
-  group_by(year, year_bin, species_lump, lon_bin, lat_bin) %>%
-  summarize(total_count = sum(total_count), .groups = "drop")
-```
-
-```{r}
-p <- ggplot() +
-  # Add California map
-  geom_sf(data = california, fill = "gray90", color = "black") +
-  
-  # Add species locations using hex bins
-  geom_hex(data = purple_time_df, aes(x = lon_bin, y = lat_bin, group = species_lump,
-                                      fill = species_lump, alpha = total_count), bins = 15, alpha = 0.7) +  
-  
-  scale_fill_manual(values = c("Pisaster ochraceus" = "orange", 
-                               "Strongylocentrotus purpuratus" = "purple" # Adjusted for clarity
-                               #"Mytilus californianus" = "purple"  # Adjusted for distinction
-  )) +
-  
-  # Labels and theme
-  labs(title = "Species Distribution Over Time in California", 
-       subtitle = "Year: {frame_time}", x = "Longitude", y = "Latitude") +
-  theme_minimal() +
-  
-  # Animate over years
-  transition_time(as.integer(year_bin)) +
-  ease_aes("linear")
-
-# Render animation
-animate(p, fps = 2, width = 800, height = 600)
-```
-
-
 ```{r}
 centroids <- purple_df %>%
-  group_by(year, species_lump) %>%
-  summarize(lon = mean(longitude), lat = mean(latitude), count = sum(total_count))
-
+  group_by(year, region, species_lump) %>%  # Group by species
+  summarize(lon = mean(longitude, na.rm = TRUE),  # Compute mean longitude
+            lat = mean(latitude, na.rm = TRUE)) %>%  # Compute mean latitude
+  ungroup() %>% 
+  complete(year, region, species_lump, fill = list(lon = NA, lat = NA)) %>%
+  group_by(region, species_lump) %>%  # Group by species and region
+  mutate(lon = na.approx(lon, na.rm = FALSE),  # Interpolate longitude
+         lat = na.approx(lat, na.rm = FALSE)) %>%  # Interpolate latitude
+  ungroup()
 ```
 
 ```{r}
+centroids_draft <- centroids 
+
 p1 <- ggplot() +
   # Add California map
-  geom_sf(data = california, fill = "gray90", color = "black") +
+  geom_sf(data = california, fill = "#b8dab3") + 
   
-  # Points for centroid locations
-  geom_text(data = centroids,
-            label = "*", 
-            aes(x = lon, y = lat, color = species_lump), size = 10) +  
+  geom_image(data = centroids_draft %>% 
+               filter(species_lump == "Strongylocentrotus purpuratus"),
+             image = here("images", "purple-urchin.png"),
+             aes(x = lon, y = lat, group = region, color = species_lump), size = .07) + 
   
-  # Set species colors manually (ensure column names match)
-  scale_color_manual(values = c("Pisaster ochraceus" = "orange", 
-                                "Strongylocentrotus purpuratus" = "purple")) +  # Adjusted colors
+  geom_image(data = centroids_draft %>%
+               filter(species_lump == "Strongylocentrotus purpuratus"),
+             image = here("images", "purple-urchin.png"),
+             aes(x = lon, y = lat, group = region), size = .06) +
   
-  # Labels and theme
-  labs(title = "Species Distribution Over Time in California", 
-       subtitle = "Year: {frame_time}", x = "Longitude", y = "Latitude") +
-  theme_minimal() +
+  geom_image(data = centroids_draft %>% 
+               filter(species_lump == "Pisaster ochraceus"),
+             image = here("images", "purple-sea-star.png"),
+             aes(x = lon, y = lat, color = species_lump, group = region), size = .11) +
   
-  theme(text = element_text(family = "Slackey")) +
+  geom_image(data = centroids_draft %>%
+               filter(species_lump == "Pisaster ochraceus"),
+             image = here("images", "purple-sea-star.png"),
+             aes(x = lon, y = lat, group = region), size = .1) +
+  
+  scale_color_manual(values = c("Pisaster ochraceus" = "#859ED7", 
+                                "Strongylocentrotus purpuratus" = "#859ED7")) +
+  
+  
+  geom_hline(yintercept=34.44, linetype="dashed", color = colors["Blue"]) +
+  
+  geom_hline(yintercept=37.82, linetype="dashed", color = colors["Blue"]) +
+  
+  annotate("text", x=-122.75, y=39.5, hjust=0, vjust=0, 
+           label = "North\nCoast", 
+           family="Slackey", color=colors["Purple"]) +
+  annotate("text", x=-120, y=35.5, hjust=0, vjust=0, 
+           label = "Central\nCoast", 
+           family="Slackey", color=colors["Purple"]) +
+  annotate("text", x=-117.25, y=33, hjust=0, vjust=0, 
+           label = "South\nCoast", 
+           family="Slackey", color=colors["Purple"]) +
+  
+  labs(title = "{frame_time}") +
+  theme_spongebob() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    panel.grid.major = element_blank(),
+    legend.position = "none", 
+    plot.title.position = "plot", 
+    plot.title = element_text(hjust = .22, vjust = 0, size = 12, color = colors["Purple"])
+  ) +
   
   # Animate over years
   transition_time(as.integer(year)) +
   ease_aes("linear")
 
 # Render animation
-animate(p1, fps = 10, width = 800, height = 600)
+#animate(p1, fps = 20, res = 200, height = 720, width = 720, duration=11)
+#anim_save(here("images/distributions.gif"))
 ```
-
-#### Latitudinal Shift Map
 
 
 ```{r}
-purple_df$lat_bin <- cut(purple_df$latitude, 
-                         breaks = seq(32, 42, 2),  
-                         include.lowest = TRUE,
-                         labels = c("32 - 33",
-                                    "34 - 35",
-                                    "36 - 37",
-                                    "38 - 39",
-                                    "40 - 41"))
-
-
-
-purple_df$year_bin <- cut(purple_df$year, 
-                          breaks = c(2001, 2005, 2009, 2013,
-                                     2017, 2021),  
-                          include.lowest = TRUE, 
-                          right = FALSE,
-                          labels = c("2001-2004",
-                                     "2005-2008",
-                                     "2009-2012",
-                                     "2013-2016",
-                                     "2017-2020"))
-```
-
-```{r, fig.width=10, fig.height=6}
-
-# Maybe I can group a mean by the latitudnal bins then show how those shift on a plot of CA
-
-ggplot(purple_df, aes(x = latitude, y = year_bin, color = species_lump,
-                      fill = species_lump)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, 
-                               fill = NA) +  
+ggplot() +
+  # Add California map
+  geom_sf(data = california, fill = "#b8dab3") + 
   
-  # Set species colors manually (ensure column names match)
-  scale_color_manual(values = c("Pisaster ochraceus" = "orange", 
-                                "Strongylocentrotus purpuratus" = "purple")) +
-  scale_fill_manual(values = c("Pisaster ochraceus" = "orange", 
-                               "Strongylocentrotus purpuratus" = "purple")) +
-  theme_minimal(base_size = 14) +
+  geom_image(data = centroids %>% 
+               filter(species_lump == "Strongylocentrotus purpuratus") %>% 
+               filter(year == 2010),
+             image = here("images/purple-urchin.png"),
+             aes(x = lon, y = lat, group = region, color = colors["Blue"]), size = .07) + 
+  
+  geom_image(data = centroids %>%
+               filter(species_lump == "Strongylocentrotus purpuratus") %>%
+               filter(year == 2010),
+             image = here("images/purple-urchin.png"),
+             aes(x = lon, y = lat, group = region), size = .06) +
+  
+  geom_image(data = centroids %>% 
+               filter(species_lump == "Pisaster ochraceus") %>% 
+               filter(year == 2010),
+             image = here("images/purple-sea-star.png"),
+             aes(x = lon, y = lat, color = colors["Blue"], group = region), size = .11) +
+  
+  geom_image(data = centroids %>%
+               filter(species_lump == "Pisaster ochraceus") %>%
+               filter(year == 2010),
+             image = here("images/purple-sea-star.png"),
+             aes(x = lon, y = lat, group = region), size = .1) +
+  
+  
+  geom_hline(yintercept=34.44, linetype="dashed", color = colors["Blue"]) +
+  
+  geom_hline(yintercept=37.82, linetype="dashed", color = colors["Blue"]) +
+  
+  annotate("text", x=-122.75, y=39.5, hjust=0, vjust=0, label = "North\nCoast", 
+           family="Slackey", color=colors["Purple"]) +
+  annotate("text", x=-119.75, y=35.5, hjust=0, vjust=0, label = "Central\nCoast", 
+           family="Slackey", color=colors["Purple"]) +
+  annotate("text", x=-117, y=33.25, hjust=0, vjust=0, label = "South\nCoast", 
+           family="Slackey", color=colors["Purple"]) +
+  
+  labs(title = "{frame_time}") +
+  theme_spongebob() +
   theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
     panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    legend.position = "none",
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14),
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+    legend.position = "none",  
+    plot.title.position = "plot",
+    plot.title = element_text(hjust = .1, vjust = -90, size = 12, color = colors["Purple"])
+  )
+```
+
+
+## Abosolute plot
+
+```{r}
+
+# Compute total_count_sum first using summarise()
+pisaster_sum_perc <- purple_df %>%
+  group_by(species_lump, year_bin) %>%
+  summarise(total_count_sum = sum(total_count, na.rm = TRUE), .groups = "drop") 
+
+# Plot with corrected normalized count
+ggplot(pisaster_sum_perc, aes(x = year_bin, y = total_count_sum, 
+                              fill = species_lump)) +
+  geom_col(position = "stack") +  # Dodge to see separate species
+  scale_fill_manual(labels = c("Purple Sea Star", "Purple Sea Urchin"),
+                    values = c("Pisaster ochraceus" = "#56446E", 
+                               "Strongylocentrotus purpuratus" = "#C187D4"
+  )) +
+  labs(
+    title = "<span style='color:#56446E;'>Purple Sea Stars</span>
+    <span style='color:#2A584C;'>**vs**</span>
+    <span style='color:#C187D4;'>Purple Urchins</span>
+    </span>",
+    subtitle = "",
+    x = "Year",
+    y = "Total Counts",
+    fill = "Species"
   ) +
-  labs(title = "Latitudinal Shift of Pisaster Over 20 Years",
-       x = "Latitude",
-       y = "Year",
-       fill = "Density") +
-  facet_wrap(~species_lump)
+  scale_y_continuous(labels = unit_format(unit = "k", scale = 1e-3)) +
+  theme_spongebob() +
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(size = 12),
+    axis.title = element_markdown(size = 14),
+    plot.title = element_markdown(size = 16, face = "bold", hjust = .5)
+  ) 
 
 ```
+
