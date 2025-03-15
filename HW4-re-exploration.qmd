@@ -50,6 +50,7 @@ I like how the colors fill up the animal outline, I think it can help me portay 
 # Load packages 
 library(tidyverse)
 library(here)
+library(sf)
 library(gganimate)
 library(sysfonts)
 library(rnaturalearth)  
@@ -57,6 +58,8 @@ library(rnaturalearthdata)
 library(zoo)
 library(ggimage)
 library(scales)
+library(readxl)
+library(ggtext)
 ```
 
 
@@ -75,19 +78,20 @@ colors <- c(
   "Gold" = "#CEA940",    
   "Pink" = "#CB6D75",    
   "Green" = "#2A584C",
-  "Sand" = "#F2F0DF"
+  "Sand" = "#F2F0DF",
+  "Black" = "#49484D"
 )
 
 # Custom SpongeBob Theme - without background image
 theme_spongebob <- function() {
   theme_minimal(base_size = 14) +
     theme(
-      text = element_text(family = "Slackey", color = "#56446E"),
+      text = element_text(family = "Slackey", color = colors["Black"]),
       axis.title = element_text(face = "bold"),
       axis.text = element_text(face = "italic"),
       legend.text = element_text(face = "bold"),
       panel.background = element_blank(),
-      plot.background = element_rect(fill = colors["Sand"], color = NA),  # Use a color, not an image path
+      plot.background = element_rect(fill = "transparent", color = "transparent"),  # Use a color, not an image path
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       legend.box.background = element_rect(fill='transparent'),
@@ -213,14 +217,17 @@ purple_sum <- purple_df %>%
 
 ```{r}
 # Apply smoothing beforehand
+showtext::showtext_auto()
+showtext::showtext_opts(dpi = 250)
 smoothed_data <- purple_sum %>%
   group_by(species_lump, mpa) %>%
   mutate(num_count_smooth = predict(loess(num_count ~ year, span = 0.5)))
 
 # Plot the smoothed data
-ggplot(smoothed_data, aes(x = year, y = num_count_smooth, 
-                          fill = factor(species_lump, levels = c("Strongylocentrotus purpuratus",
-                                                                 "Pisaster ochraceus")))) +  
+p2 <- ggplot(smoothed_data, aes(x = year, y = num_count_smooth, 
+                          fill = factor(species_lump, 
+                                        levels = c("Strongylocentrotus purpuratus",
+                                                   "Pisaster ochraceus")))) +  
   facet_wrap(~mpa, 
              labeller = labeller(
                mpa = c("TRUE" = "MPAs", "FALSE" = "non MPAs" )
@@ -230,31 +237,35 @@ ggplot(smoothed_data, aes(x = year, y = num_count_smooth,
                                "Strongylocentrotus purpuratus" = "#C187D4" 
   )) +
   labs(
-    title = "<span style='color:#56446E;'>Purple Sea Stars</span>
-    <span style='color:#2A584C;'>**vs**</span>
-    <span style='color:#C187D4;'>Purple Urchins</span>
-    </span>",
-    subtitle = "MPAs provide stable population fluctuations",
     x = "Year",
     y = "Relative Abundance",
     fill = "Species"
   ) +
-  scale_y_continuous(labels = scales::percent) +
+  scale_y_continuous(breaks=c(.5,1), labels = scales::percent) +
   scale_x_continuous(breaks=c(2001, 2010, 2020)) +
   coord_flip() +
   theme_spongebob() +
   theme(
-    axis.text = element_text(size=8, margin = margin(0,0,3,0, "cm")),
-    axis.title = element_text(margin = margin(0,0,3,0, "cm")),
+    axis.ticks.x = element_line(color = colors["Purple"]),
+    axis.ticks.length = unit(3, "pt"),
+    axis.title.y = element_blank(),
+    axis.text = element_text(size=16, margin = margin(8,8,8,8, "pt")),
+    axis.title = element_markdown(size = 18, color = colors["Black"], margin = margin(25, 0, 0, 0)),
     panel.grid.major = element_blank(),
     legend.position = "none", 
     plot.title.position = "plot", 
-    panel.spacing = unit(1.5, "lines"),
-    plot.title = element_markdown(hjust = .5, vjust = 0, size = 16, color = colors["Purple"]),
-    plot.subtitle = element_text(hjust = .5, vjust = 0, size = 13, color = colors["Green"]),
-    strip.text = element_text(hjust = .5, vjust = 0, size = 10, color = colors["Blue"]),
+    plot.margin = margin(1, 1, 1, 1, "cm"),  # Increased margins
+    panel.spacing = unit(3, "lines"),  # Increased panel spacing
+    plot.title = element_markdown(hjust = .5, vjust = 0, size = 22, color = colors["Purple"], 
+                              margin = margin(0, 0, 20, 0, "pt")),  # Added bottom margin to title
+    plot.subtitle = element_text(hjust = .5, vjust = 0, size = 22, color = colors["Green"],
+                             margin = margin(0, 0, 25, 0, "pt")),  # Added bottom margin to subtitle
+    strip.text = element_text(hjust = .5, vjust = 0, size = 18, color = colors["Blue"])
   ) 
 
+ggsave(filename=here("images/rel_abund.png"), width = 20, height = 16, units = "cm", dpi = 300)
+
+p2
 ```
 
 
@@ -270,14 +281,16 @@ california <- ne_states(country = "United States of America", returnclass = "sf"
 
 ```{r}
 centroids <- purple_df %>%
-  group_by(year, region, species_lump) %>%  # Group by species
-  summarize(lon = mean(longitude, na.rm = TRUE),  # Compute mean longitude
-            lat = mean(latitude, na.rm = TRUE)) %>%  # Compute mean latitude
+  # find average location by region and species
+  group_by(year, region, species_lump) %>%  
+  summarize(lon = mean(longitude, na.rm = TRUE),  
+            lat = mean(latitude, na.rm = TRUE)) %>% 
   ungroup() %>% 
+  # interpolate missing data for smooth transitions
   complete(year, region, species_lump, fill = list(lon = NA, lat = NA)) %>%
-  group_by(region, species_lump) %>%  # Group by species and region
-  mutate(lon = na.approx(lon, na.rm = FALSE),  # Interpolate longitude
-         lat = na.approx(lat, na.rm = FALSE)) %>%  # Interpolate latitude
+  group_by(region, species_lump) %>% 
+  mutate(lon = na.approx(lon, na.rm = FALSE),  
+         lat = na.approx(lat, na.rm = FALSE)) %>%  
   ungroup()
 ```
 
@@ -341,8 +354,8 @@ p1 <- ggplot() +
   transition_time(as.integer(year)) +
   ease_aes("linear")
 
-# Render animation
-#animate(p1, fps = 20, res = 200, height = 720, width = 720, duration=11)
+# Render animation (uncomment to run)
+#animate(p1, fps = 20, res = 200, height = 480, width = 480, duration=11, bg = 'transparent')
 #anim_save(here("images/distributions.gif"))
 ```
 
@@ -352,40 +365,46 @@ ggplot() +
   # Add California map
   geom_sf(data = california, fill = "#b8dab3") + 
   
-  geom_image(data = centroids %>% 
-               filter(species_lump == "Strongylocentrotus purpuratus") %>% 
-               filter(year == 2010),
-             image = here("images/purple-urchin.png"),
-             aes(x = lon, y = lat, group = region, color = colors["Blue"]), size = .07) + 
+  geom_image(data = centroids_draft %>% 
+               filter(year==2016) %>% 
+               filter(species_lump == "Strongylocentrotus purpuratus"),
+             image = here("images", "purple-urchin.png"),
+             aes(x = lon, y = lat, group = region, color = species_lump), size = .07) + 
   
-  geom_image(data = centroids %>%
-               filter(species_lump == "Strongylocentrotus purpuratus") %>%
-               filter(year == 2010),
-             image = here("images/purple-urchin.png"),
+  geom_image(data = centroids_draft %>%
+               filter(year==2016) %>% 
+               filter(species_lump == "Strongylocentrotus purpuratus"),
+             image = here("images", "purple-urchin.png"),
              aes(x = lon, y = lat, group = region), size = .06) +
   
-  geom_image(data = centroids %>% 
-               filter(species_lump == "Pisaster ochraceus") %>% 
-               filter(year == 2010),
-             image = here("images/purple-sea-star.png"),
-             aes(x = lon, y = lat, color = colors["Blue"], group = region), size = .11) +
+  geom_image(data = centroids_draft %>% 
+               filter(year==2016) %>% 
+               filter(species_lump == "Pisaster ochraceus"),
+             image = here("images", "purple-sea-star.png"),
+             aes(x = lon, y = lat, color = species_lump, group = region), size = .11) +
   
-  geom_image(data = centroids %>%
-               filter(species_lump == "Pisaster ochraceus") %>%
-               filter(year == 2010),
-             image = here("images/purple-sea-star.png"),
+  geom_image(data = centroids_draft %>%
+               filter(year==2016) %>% 
+               filter(species_lump == "Pisaster ochraceus"),
+             image = here("images", "purple-sea-star.png"),
              aes(x = lon, y = lat, group = region), size = .1) +
+  
+  scale_color_manual(values = c("Pisaster ochraceus" = "#859ED7", 
+                                "Strongylocentrotus purpuratus" = "#859ED7")) +
   
   
   geom_hline(yintercept=34.44, linetype="dashed", color = colors["Blue"]) +
   
   geom_hline(yintercept=37.82, linetype="dashed", color = colors["Blue"]) +
   
-  annotate("text", x=-122.75, y=39.5, hjust=0, vjust=0, label = "North\nCoast", 
+  annotate("text", x=-122.75, y=39.5, hjust=0, vjust=0, 
+           label = "North\nCoast", 
            family="Slackey", color=colors["Purple"]) +
-  annotate("text", x=-119.75, y=35.5, hjust=0, vjust=0, label = "Central\nCoast", 
+  annotate("text", x=-120, y=35.5, hjust=0, vjust=0, 
+           label = "Central\nCoast", 
            family="Slackey", color=colors["Purple"]) +
-  annotate("text", x=-117, y=33.25, hjust=0, vjust=0, label = "South\nCoast", 
+  annotate("text", x=-117.25, y=33, hjust=0, vjust=0, 
+           label = "South\nCoast", 
            family="Slackey", color=colors["Purple"]) +
   
   labs(title = "{frame_time}") +
@@ -394,9 +413,9 @@ ggplot() +
     axis.title = element_blank(),
     axis.text = element_blank(),
     panel.grid.major = element_blank(),
-    legend.position = "none",  
-    plot.title.position = "plot",
-    plot.title = element_text(hjust = .1, vjust = -90, size = 12, color = colors["Purple"])
+    legend.position = "none", 
+    plot.title.position = "plot", 
+    plot.title = element_text(hjust = .22, vjust = 0, size = 12, color = colors["Purple"])
   )
 ```
 
@@ -404,39 +423,51 @@ ggplot() +
 ## Abosolute plot
 
 ```{r}
-
+showtext::showtext_auto()
+showtext::showtext_opts(dpi = 250)
 # Compute total_count_sum first using summarise()
 pisaster_sum_perc <- purple_df %>%
   group_by(species_lump, year_bin) %>%
   summarise(total_count_sum = sum(total_count, na.rm = TRUE), .groups = "drop") 
 
+
 # Plot with corrected normalized count
 p3 <- ggplot(pisaster_sum_perc, aes(x = year_bin, y = total_count_sum, 
-                              fill = species_lump)) +
+                              fill = factor(species_lump, 
+                                        levels = c("Strongylocentrotus purpuratus",
+                                                   "Pisaster ochraceus")))) +
   geom_col(position = "stack") +  # Dodge to see separate species
   scale_fill_manual(labels = c("Purple Sea Star", "Purple Sea Urchin"),
                     values = c("Pisaster ochraceus" = "#56446E", 
                                "Strongylocentrotus purpuratus" = "#C187D4"
   )) +
   labs(
-    title = "<span style='color:#56446E;'>Purple Sea Stars</span>
-    <span style='color:#2A584C;'>**vs**</span>
-    <span style='color:#C187D4;'>Purple Urchins</span>
-    </span>",
-    subtitle = "",
+    #title = "<span style='color:#56446E;'>Purple Sea Stars</span>
+    #<span style='color:#49484D;'>**vs**</span>
+    #<span style='color:#C187D4;'>Purple Urchins</span>
+    #</span>",
+    #subtitle = "Populations recover asymetrically after shock",
     x = "Year",
     y = "Total Counts",
     fill = "Species"
   ) +
+  coord_flip() +
   scale_y_continuous(labels = unit_format(unit = "k", scale = 1e-3)) +
   theme_spongebob() +
   theme(
+    axis.ticks.x = element_line(color = colors["Purple"]),
+    axis.ticks.length = unit(3, "pt"),
+    plot.subtitle = element_markdown(hjust=.5, color=colors["Green"]),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(color=colors["Black"]),
     legend.position = "none",
     panel.grid.minor = element_blank(),
-    axis.text = element_text(size = 12),
-    axis.title = element_markdown(size = 14),
-    plot.title = element_markdown(size = 16, face = "bold", hjust = .5)
+    axis.text = element_text(size = 16, color=colors["Black"]),
+    axis.title = element_markdown(size = 18),
+    plot.title = element_markdown(size = 20, face = "bold", hjust = .5),
+    theme(aspect.ratio=3/5)
   ) 
+#ggsave(filename=here("images/abundance.png"), width = 17, height = 13, units = "cm", dpi = 300)
 p3
 #ggbackground(p3, here("images", "sand.jpg"))
 ```
