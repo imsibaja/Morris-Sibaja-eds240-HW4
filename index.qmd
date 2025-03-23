@@ -12,11 +12,14 @@ format:
 
 ## Introduction
 
-Sea stars and sea urchins play an important role in ocean ecosystems. Sea stars are generally population controllers. Purple sea stars (Pisaster ochraceus) in particular control sea snail, mussel, and urchin populations which allows other species, such as barnacles and algae, to thrive with adequate resources. Additionally, algae provide habitat and food for a plethora of other species - species such as the pacific purple sea urchin (Strongylocentrotus purpuratus), who are herbivores that graze on algae. In addition to algae, urchins will passively wait for detritus (kelp fragments) to float their way. However, in times of scarcity, urchins will hunt kelp forests to feed on.
+Sea stars and sea urchins have a critical ecological relationship that helps maintain balance in ocean ecosystems:
 
-Kelp forests are essential for ocean health. They provide food, shelter, and other protections for marine life. Additionally, they are an important resource in economic and commercial opportunities explored by humans. As such, maintaining kelp forest health is pertinent to protect the ocean.
+-   Purple sea stars (Pisaster ochraceus) act as population controllers by preying on sea snails, mussels, and urchins
+-   This predation prevents any single species from dominating and allows barnacles and algae to thrive
+-   Pacific purple sea urchins (Strongylocentrotus purpuratus) primarily graze on algae and consume floating kelp fragments
+-   During food scarcity, urchins actively hunt kelp forests, often targeting the "holdfast" (root-like anchoring structure)
 
-Without sea stars, urchins may overgraze kelp. Urchins tend to feed on the "holdfast", or base root like structure of the kelp. When grazing is focused on the holdfast, kelp forests can be quickly and systematically decimated, as without any anchor, the kelp will be swept away from the current. With urchin overgrazing, "urchin barrens" are created, reducing a thriving ecosystem to a excess of urchins and algae that cover the ocean floor.
+Without sea star predation, urchin populations can explode, leading to systematic destruction of kelp forests. The result is "urchin barrens" - areas where thriving ecosystems are reduced to excess urchins and algae covering the ocean floor.
 
 With that in mind, I explored intertidal observations of the Pacific purple sea urchin and purple sea stars with the goal of diving more into the emperical relationship between these two sea species. I chose these observations to answer the question:
 
@@ -33,33 +36,33 @@ alt="Infographic illustrating the relationship between Purple Sea Stars (Pisaste
 
 ## Design Process
 
-When I was younger I watched alot of TV, specifically Spongebob. The show always filled me with wonder thinking of all the sea life out there. I wanted to expand on that same feeling it gave me but present it in a more educational format. 
+When I was younger I watched alot of TV, specifically Spongebob. The show always filled me with wonder thinking of all the sea life out there. I wanted to expand on that same feeling it gave me but present it in a more educational format.
 
-As such, all aesthetic choices were borrowed from the TV show. The title and plot fonts are a recreation of the font seen on the show. When choosing the smaller text, I wanted to keep the same fun, easygoing flow with increase legibility, so I found a more subdued version of that same font. The colors are directly taken from stills that I found particularly pleasing. I did consciously choose colors that would translate well to individuals with color vision deficiencies but still retain the relaxed and fun atmosphere that Spongebob had in every episode. Similarly, an alt text was added to the entire inforgraphic to support individuals who are blind or have visual impairments.
+As such, all aesthetic choices were borrowed from the TV show. The title and plot fonts are a recreation of the font seen on the show. When choosing the smaller text, I wanted to keep the same fun, easygoing flow with increased legibility, so I found a more subdued version of that same font. The colors are directly taken from stills that I found particularly pleasing. I did consciously choose colors that would translate well to individuals with color vision deficiencies but still retain the relaxed and fun atmosphere that SpongeBob had in every episode. Similarly, alt text was added to the entire infographic to support individuals who are blind or have visual impairments.
 
 To have the overall design fit the theme, I broke up the main question into three separate subquestions:
 
-1) *How do these two species spatially interact?*
+1)  *How do these two species spatially interact?*
 
 To illustrate the geographic relationship between the Pacific purple sea urchin and the purple sea star, I created a geographic scatter plot from the obserations data. By grouping the region (North, Central, South) and species variables, I calculated the centroids of the locations by year. This gave me a dataframe of all locations, which I then overlayed on a shapefile of California and exported all years into a .gif to see the movement over time.
 
-2) *Have the total abundances changed over time?*
+2)  *Have the total abundances changed over time?*
 
 For my second visualization, I used a the overall abundances over 5 binned year ranges to gauge the general trends in which the species populations have fluctuated in the past twenty years.
 
-3) *Do environmental regulations provide protections for a more balanced ecosystem* 
+3)  *Do environmental regulations provide protections for a more balanced ecosystem*
 
 To answer this question, I grouped the species by MPA status, and created a relative abundance plot. The goal of this visualization was to envision how populations fluctuate relative to each other depending on if they are in protected waters or not.
 
-Though these questions are not explicitly stated within the infographic, this choice was intentional. I found there to be too much text if they were included. I wanted readers to easily guide themselves down the infographic without having to feel like they were learning something. By doing this, I hope the reader will learn through osmosis (ie. sponge-like) and come to conclusions themselves. Additionally, I added small paragraphs to add context to each visualizations with key words. These key words were provided without much context for the reader to continue their own exploration into this subject if they desired to. The overall infographic was meant for more sparking intrigue within the subject, rather than detailing a full analysis. 
+Though these questions are not explicitly stated within the infographic, this choice was intentional. I found there to be too much text if they were included. I wanted readers to easily guide themselves down the infographic without having to feel like they were learning something. By doing this, I hope the reader will learn through osmosis (ie. sponge-like) and come to conclusions themselves. Additionally, I added small paragraphs to add context to each visualizations with key words. These key words were provided without much context for the reader to continue their own exploration into this subject if they desired to. The overall infographic was meant for more sparking intrigue within the subject, rather than detailing a full analysis.
 
-Though my infographic is focused on ecological relationships within the sea, it is important to recognize that these are not just data points of animals in a far off land. Fluctuations in sea star and urchin populations affect coastal communities that may rely on the commercial aspect of kelp forests. These especially include as food and income, especially within the growing kelp farming industry. Indigenous communities may have deep cultural ties to kelp forests, such as the Tolowa Dee-ni’ Nation. These flucuations threaten their traditional practices and food security as kelp forests decline. Climate change, an issue that affects us all, may further exacerbates threats to marine habitats and species distributions, which in turn may disproportionately affect marginalized communities with fewer resources to adapt. 
+Though my infographic is focused on ecological relationships within the sea, it is important to recognize that these are not just data points of animals in a far off land. Fluctuations in sea star and urchin populations affect coastal communities that may rely on the commercial aspect of kelp forests. These especially provide food and economic opportunities, particularly in the expanding kelp farming sector. Indigenous communities may have deep cultural ties to kelp forests, such as the Tolowa Dee-ni’ Nation. These fluctuations threaten their traditional practices and food security as kelp forests decline. Climate change, an issue that affects us all, may further exacerbates threats to marine habitats and species distributions, which in turn may disproportionately affect marginalized communities with fewer resources to adapt.
 
 ## Key Takeaways:
 
-- Spatial Interaction: Purple sea stars and urchins have shifting geographic distributions over time, with often sea stars and sea urchins remaining in similar locations.
-- Population Trends: Over the past 20 years, fluctuations in the populations of purple sea stars and urchins indicate an imbalance, with some years seeing a sharp decline in urchin and sea star numbers.
-- Environmental Protections: Marine Protected Areas (MPAs) show more balanced populations of sea stars and urchins, suggesting that protections can help maintain healthy ecosystems.
+-   Spatial Interaction: Purple sea stars and urchins have shifting geographic distributions over time, with often sea stars and sea urchins remaining in similar locations.
+-   Population Trends: Over the past 20 years, fluctuations in the populations of purple sea stars and urchins indicate an imbalance, with some years seeing a sharp decline in urchin and sea star numbers.
+-   Environmental Protections: Marine Protected Areas (MPAs) show more stable populations of sea stars and urchins over time, suggesting that protections can help maintain healthy ecosystems.
 
 This infographic highlights how the dynamic between purple sea stars and purple sea urchins shapes marine ecosystems, and explores differing scales in which either populations are impacted.
 
@@ -69,8 +72,8 @@ If wanting to replicated my code, follow the steps below. Please contact me for 
 
 All graphs, as you will see, were created in R. However the infographic itself was compiled using Affinity Designer 2.
 
-
 ### Code
+
 ```{r}
 #| eval: false
 #| echo: true
